@@ -1,0 +1,4 @@
+haploh-median-depths.o: haploh-median-depths.c ../local/include/vcfio.h \
+  ../local/include/vcfio-protos.h
+	${CC} -c ${CFLAGS} haploh-median-depths.c
+
