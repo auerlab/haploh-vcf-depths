@@ -22,11 +22,9 @@
 int     main(int argc,const char *argv[])
 
 {
-    FILE        *event_stream;
     const char  *sample_id,
 		*event_file,
 		*glob_pattern;
-    struct stat dir_stat;
     
     if ( argc != 4 )
 	usage(argv);
@@ -66,10 +64,18 @@ int     haploh_median_depths(const char *sample_id, const char *event_file,
 {
     int     separator;
     event_t event;
-    FILE    *event_stream;
+    FILE    *event_stream,
+	    *vcf_stream;
     glob_t  glob_list;
-    char    **p;
+    char    **vcf_filename_ptr;
+    bool    same_sample,
+	    compressed;
+    int             status;
+    unsigned long   count;
+    static vcf_call_t  vcf_call = VCF_CALL_INIT;
+    static char        vcf_sample[VCF_SAMPLE_MAX_CHARS + 1];
     
+    fprintf(stderr, "%s\n", event_file);
     if ( (event_stream = fopen(event_file, "r")) == NULL )
     {
 	fprintf(stderr, "Cannot open %s: %s\n", event_file, strerror(errno));
@@ -84,31 +90,82 @@ int     haploh_median_depths(const char *sample_id, const char *event_file,
      *  Both files should be sorted by chromosome and position.
      */
     
-    while ( ((separator = read_event(event_stream, &event)) == EVENT_READ_OK)
-	    || (separator == EVENT_READ_HEADER) )
+    for (vcf_filename_ptr = glob_list.gl_pathv; *vcf_filename_ptr != NULL;
+	    ++vcf_filename_ptr)
     {
-	fprintf(stderr, "%s %zu %zu\n", event.chromosome, event.begin, event.end);
-    
-	/*
-	 *  Compute median depth of VCF calls between event.begin and event.end
-	 *  for this sample.
-	 */
-       
-	for (p = glob_list.gl_pathv; *p != NULL; ++p)
+	fprintf(stderr, "%s %s\n", *vcf_filename_ptr, sample_id);
+	same_sample = (strstr(*vcf_filename_ptr, sample_id) != NULL);
+	
+	// Open VCF file
+	if ( (vcf_stream = vcf_open(*vcf_filename_ptr, &compressed)) == NULL )
 	{
-	    //fprintf(stderr, "%s %s\n", *p, sample_id);
-	    if ( strstr(*p, sample_id) != NULL )
-	    {
-		fprintf(stderr, "Matching VCF file: %s\n", *p);
-		printf("Median depth = %u\n", median_depth(*p, &event));
-	    }
+	    fprintf(stderr, "Error opening VCF file %s.\n", *vcf_filename_ptr);
+	    exit(EX_NOINPUT);
 	}
 	
-	/*
-	 *  Compute median depth of VCF calls between event.begin and event.end
-	 *  for all other samples.
-	 */
-	// Use glob()?
+	// Skip header
+	while ( (separator = read_event(event_stream, &event)) == EVENT_READ_HEADER )
+	    ;
+	
+	// Read next event
+	while ( separator == EVENT_READ_OK )
+	{
+	    fprintf(stderr, "Event: %s %zu %zu\n", event.chromosome,
+		    event.begin, event.end);
+	    count = 0;
+    
+	    /*
+	     *  Compute median depth of VCF calls between event.begin and event.end
+	     *  for this sample.
+	     *  Compute median depth of VCF calls between event.begin and event.end
+	     *  for all other samples.
+	     */
+	    
+	    // Skip calls for earlier chromosomes or positions
+	    while ( ((status = vcf_read_ss_call(vcf_stream, &vcf_call, vcf_sample,
+						VCF_SAMPLE_MAX_CHARS)) == VCF_READ_OK) &&
+		     ((chromosome_name_cmp(vcf_call.chromosome,
+					  event.chromosome) < 0) ||
+		     (vcf_call.pos < event.begin)) )
+		;
+	    fprintf(stderr, "Skipped calls up to %s %zu\n",
+		    vcf_call.chromosome, vcf_call.pos);
+	    
+	    // Count calls for same chromosome and within range
+	    while ( (status == VCF_READ_OK) &&
+		    (chromosome_name_cmp(vcf_call.chromosome,
+					 event.chromosome) == 0) &&
+		    (vcf_call.pos <= event.end) )
+	    {
+		++count;
+		status = vcf_read_ss_call(vcf_stream, &vcf_call,
+					  vcf_sample, VCF_SAMPLE_MAX_CHARS);
+	    }
+	    fprintf(stderr, "Counted calls up to %s %zu\n",
+		    vcf_call.chromosome, vcf_call.pos);
+	    
+	    fprintf(stderr, "Found %lu matching calls.\n", count);
+	    
+	    if ( (status != VCF_READ_OK) && (status != VCF_READ_EOF) )
+	    {
+		fprintf(stderr, "median_depths(): Error reading VCF file.\n");
+		exit(EX_DATAERR);
+	    }
+	    
+	    // Next event
+	    separator = read_event(event_stream, &event);
+	}
+	vcf_close(vcf_stream, compressed);
+
+	if ( separator != EVENT_READ_EOF )
+	{
+	    fprintf(stderr, "haploh_media_depths(): Error reading event stream.\n");
+	    exit(EX_DATAERR);
+	}
+
+	// Reread events file for each VCF file.  Events files are usually
+	// small, so this won't cost much.
+	rewind(event_stream);
     }
     
     fclose(event_stream);
@@ -132,7 +189,7 @@ int     read_event(FILE *event_stream, event_t *event)
 			       VCF_CHROMOSOME_MAX_CHARS, &len);
     if ( separator == '\t' )
     {
-	fprintf(stderr, "chromosome = %s\n", event->chromosome);
+	// fprintf(stderr, "chromosome = %s\n", event->chromosome);
 	
 	// BEGIN
 	if ( (separator = tsv_read_field(event_stream, temp,
@@ -181,54 +238,31 @@ int     read_event(FILE *event_stream, event_t *event)
 }
 
 
-unsigned    median_depth(const char *vcf_filename, event_t *event)
+FILE    *vcf_open(const char *vcf_filename, bool *compressed)
 
 {
     const char  *p;
+    char        cmd[1025];
     FILE        *vcf_stream;
-    char        cmd[1025],
-		vcf_sample[VCF_SAMPLE_MAX_CHARS + 1];
-    bool        compressed;
-    vcf_call_t  vcf_call;
-    int         status;
-    size_t      len;
-    unsigned long   count = 0;
     
     p = strstr(vcf_filename, ".xz");
-    compressed = (p != NULL) && (strcmp(p,".xz") == 0);
-    if ( compressed )
+    *compressed = (p != NULL) && (strcmp(p,".xz") == 0);
+    if ( *compressed )
     {
 	snprintf(cmd, 1024, "xzcat %s", vcf_filename);
 	vcf_stream = popen(cmd, "r");
     }
     else
 	vcf_stream = fopen(vcf_filename, "r");
-    
-    while ( (status = vcf_read_static_fields(vcf_stream, &vcf_call)) == VCF_READ_OK )
-    {
-	if ( tsv_read_field(vcf_stream, vcf_sample, VCF_SAMPLE_MAX_CHARS, &len) != '\n' )
-	{
-	    fprintf(stderr, "median_depth(): Expected newline after VCF sample.\n");
-	    exit(EX_DATAERR);
-	}
-	if ( (strcmp(vcf_call.chromosome, event->chromosome) == 0) &&
-	     (vcf_call.pos >= event->begin) && (vcf_call.pos <= event->end) )
-	{
-	    //fprintf(stderr, "%s\n", vcf_call.samples[0]);
-	    ++count;
-	}
-    }
-    fprintf(stderr, "Found %lu matching calls.\n", count);
-    
-    if ( status != VCF_READ_EOF )
-    {
-	fprintf(stderr, "Error reading VCF file.\n");
-	exit(EX_DATAERR);
-    }
-    
+    return vcf_stream;
+}
+
+
+int     vcf_close(FILE *vcf_stream, bool compressed)
+
+{
     if ( compressed )
-	pclose(vcf_stream);
+	return pclose(vcf_stream);
     else
-	fclose(vcf_stream);
-    return 0;
+	return fclose(vcf_stream);
 }
