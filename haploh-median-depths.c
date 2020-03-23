@@ -15,28 +15,27 @@
 #include <string.h>
 #include <vcfio.h>
 #include <tsvio.h>
+#include <glob.h>
+#include <stdbool.h>
 #include "haploh-median-depths.h"
 
 int     main(int argc,const char *argv[])
 
 {
     FILE        *event_stream;
-    const char  *event_file,
-		*vcf_dir;
+    const char  *sample_id,
+		*event_file,
+		*glob_pattern;
     struct stat dir_stat;
     
-    if ( argc != 3 )
+    if ( argc != 4 )
 	usage(argv);
 
-    event_file = argv[1];
-    vcf_dir = argv[2];
+    sample_id = argv[1];
+    event_file = argv[2];
+    glob_pattern = argv[3];
     
-    if ( (event_stream = fopen(event_file, "r")) == NULL )
-    {
-	fprintf(stderr, "Cannot open %s: %s\n", event_file, strerror(errno));
-	exit(EX_NOINPUT);
-    }
-    
+    /*
     if ( (stat(vcf_dir, &dir_stat) == -1) || !S_ISDIR(dir_stat.st_mode) )
     {
 	fprintf(stderr,
@@ -44,34 +43,66 @@ int     main(int argc,const char *argv[])
 		vcf_dir);
 	exit(EX_NOINPUT);
     }
+    */
 	    
-    return haploh_median_depths(argv, event_stream, vcf_dir);
+    return haploh_median_depths(sample_id, event_file, glob_pattern);
 }
 
 
 void    usage(const char *argv[])
 
 {
-    fprintf(stderr, "Usage: %s haplohseq-event-file directory-with-VCF-files\n", argv[0]);
+    fprintf(stderr, "\nUsage: %s sample-id haplohseq-event-file 'vcf-filename-glob'\n", argv[0]);
+    fprintf(stderr, "\nVCF filenames must contain the sample-id. The glob for VCF filenames must\n");
+    fprintf(stderr, "contain a '*' where the sample-id appears and must be enclosed in quotes.\n\n");
+    fprintf(stderr, "E.g. for files like combined-NWD294426-ad.vcf.xz, glob = 'combined-*-ad.vcf.xz'.\n\n");
     exit(EX_USAGE);
 }
 
 
-int     haploh_median_depths(const char *argv[], FILE *event_stream,
-			     const char *vcf_dir)
+int     haploh_median_depths(const char *sample_id, const char *event_file,
+			     const char *glob_pattern)
 
 {
     int     separator;
     event_t event;
+    FILE    *event_stream;
+    glob_t  glob_list;
+    char    **p;
+    
+    if ( (event_stream = fopen(event_file, "r")) == NULL )
+    {
+	fprintf(stderr, "Cannot open %s: %s\n", event_file, strerror(errno));
+	exit(EX_NOINPUT);
+    }
+
+    glob(glob_pattern, 0, NULL, &glob_list);
+    
+    /*
+     *  FIXME: Rather than reread the same VCF file for each sample, it
+     *  would be more efficient to leapfrog through the events and VCF calls.
+     *  Both files should be sorted by chromosome and position.
+     */
     
     while ( ((separator = read_event(event_stream, &event)) == EVENT_READ_OK)
 	    || (separator == EVENT_READ_HEADER) )
     {
 	fprintf(stderr, "%s %zu %zu\n", event.chromosome, event.begin, event.end);
+    
 	/*
 	 *  Compute median depth of VCF calls between event.begin and event.end
 	 *  for this sample.
 	 */
+       
+	for (p = glob_list.gl_pathv; *p != NULL; ++p)
+	{
+	    //fprintf(stderr, "%s %s\n", *p, sample_id);
+	    if ( strstr(*p, sample_id) != NULL )
+	    {
+		fprintf(stderr, "Matching VCF file: %s\n", *p);
+		printf("Median depth = %u\n", median_depth(*p, &event));
+	    }
+	}
 	
 	/*
 	 *  Compute median depth of VCF calls between event.begin and event.end
@@ -80,6 +111,7 @@ int     haploh_median_depths(const char *argv[], FILE *event_stream,
 	// Use glob()?
     }
     
+    fclose(event_stream);
     if ( separator == EOF )
 	return EX_OK;
     else
@@ -144,6 +176,59 @@ int     read_event(FILE *event_stream, event_t *event)
 	}
 	return status;
     }
-    fprintf(stderr, "separator = %d\n", separator);
+    // fprintf(stderr, "separator = %d\n", separator);
     return separator;
+}
+
+
+unsigned    median_depth(const char *vcf_filename, event_t *event)
+
+{
+    const char  *p;
+    FILE        *vcf_stream;
+    char        cmd[1025],
+		vcf_sample[VCF_SAMPLE_MAX_CHARS + 1];
+    bool        compressed;
+    vcf_call_t  vcf_call;
+    int         status;
+    size_t      len;
+    unsigned long   count = 0;
+    
+    p = strstr(vcf_filename, ".xz");
+    compressed = (p != NULL) && (strcmp(p,".xz") == 0);
+    if ( compressed )
+    {
+	snprintf(cmd, 1024, "xzcat %s", vcf_filename);
+	vcf_stream = popen(cmd, "r");
+    }
+    else
+	vcf_stream = fopen(vcf_filename, "r");
+    
+    while ( (status = vcf_read_static_fields(vcf_stream, &vcf_call)) == VCF_READ_OK )
+    {
+	if ( tsv_read_field(vcf_stream, vcf_sample, VCF_SAMPLE_MAX_CHARS, &len) != '\n' )
+	{
+	    fprintf(stderr, "median_depth(): Expected newline after VCF sample.\n");
+	    exit(EX_DATAERR);
+	}
+	if ( (strcmp(vcf_call.chromosome, event->chromosome) == 0) &&
+	     (vcf_call.pos >= event->begin) && (vcf_call.pos <= event->end) )
+	{
+	    //fprintf(stderr, "%s\n", vcf_call.samples[0]);
+	    ++count;
+	}
+    }
+    fprintf(stderr, "Found %lu matching calls.\n", count);
+    
+    if ( status != VCF_READ_EOF )
+    {
+	fprintf(stderr, "Error reading VCF file.\n");
+	exit(EX_DATAERR);
+    }
+    
+    if ( compressed )
+	pclose(vcf_stream);
+    else
+	fclose(vcf_stream);
+    return 0;
 }
