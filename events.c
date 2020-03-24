@@ -133,7 +133,6 @@ int     event_read(event_t *event, FILE *event_stream, const char *event_sample_
 	    status;
     size_t  len;
     char    temp[VCF_POSITION_MAX_CHARS + 1],
-	    filename[PATH_MAX + 1],
 	    *endptr;
     
     separator = tsv_read_field(event_stream, event->chromosome,
