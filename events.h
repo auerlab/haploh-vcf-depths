@@ -4,10 +4,10 @@ typedef struct
 {
     char    chromosome[VCF_CHROMOSOME_MAX_CHARS + 1];
     size_t  begin,
-	    end;
-    depth_t *depth_list;
-    size_t  depth_count,
-	    max_depths;
+	    end,
+	    depth_count;
+    FILE    *same_sample_depth_stream;
+    FILE    *other_samples_depth_stream;
 }   event_t;
 
 #define EVENT_READ_OK           0
@@ -18,10 +18,10 @@ typedef struct
 
 #define EVENT_DEFAULT_MAX_DEPTHS    500000  // Based on TOPMed data
 
-#define EVENT_DEPTH_COUNT(event)    ((event)->depth_count)
 #define EVENT_BEGIN(event)          ((event)->begin)
 #define EVENT_END(event)            ((event)->end)
 #define EVENT_CHROMOSOME(event)     ((event)->chromosome)
+#define EVENT_DEPTH_COUNT(event)    ((event)->depth_count)
 
 #define EVENT_MALLOC(count,type)  ((type *)malloc((count) * sizeof(type)))
 #define EVENT_REALLOC(buff, count, type) ((type *)realloc((buff), (count) * sizeof(type)))

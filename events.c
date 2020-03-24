@@ -70,20 +70,7 @@ event_t *event_read_list(const char *event_filename, size_t *event_count)
 void    event_add_depth(event_t *event, depth_t depth)
 
 {
-    /*fprintf(stderr, "[%zu] = %u %s %zu\n",
-	    event->depth_count, depth,
-	    event->chromosome, event->begin);*/
-    event->depth_list[event->depth_count++] = depth;
-    if ( event->depth_count == event->max_depths )
-    {
-	event->max_depths += event->max_depths;
-	if ( (event->depth_list = EVENT_REALLOC(event->depth_list,
-				    event->max_depths, depth_t)) == NULL )
-	{
-	    fprintf(stderr, "event_read(): Malloc failed.\n");
-	    exit(EX_UNAVAILABLE);
-	}
-    }
+    ++event->depth_count;
 }
 
 
@@ -147,12 +134,7 @@ int     event_read(FILE *event_stream, event_t *event)
     
     // fprintf(stderr, "separator = %d\n", separator);
     event->depth_count = 0;
-    event->max_depths = EVENT_DEFAULT_MAX_DEPTHS;
-    if ( (event->depth_list = EVENT_MALLOC(event->max_depths, depth_t)) == NULL )
-    {
-	fprintf(stderr, "event_read(): Malloc failed.\n");
-	exit(EX_UNAVAILABLE);
-    }
+    // Open depth files
     return separator;
 }
 

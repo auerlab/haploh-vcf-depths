@@ -17,23 +17,24 @@
 #include <tsvio.h>
 #include <glob.h>
 #include <stdbool.h>
+#include <limits.h>
 #include "haploh-median-depths.h"
 
 int     main(int argc,const char *argv[])
 
 {
-    const char  *sample_id,
+    const char  *event_sample_id,
 		*event_file,
-		*glob_pattern;
+		*vcf_glob_pattern;
     
     if ( argc != 4 )
 	usage(argv);
 
-    sample_id = argv[1];
+    event_sample_id = argv[1];
     event_file = argv[2];
-    glob_pattern = argv[3];
+    vcf_glob_pattern = argv[3];
     
-    return haploh_median_depths(sample_id, event_file, glob_pattern);
+    return haploh_median_depths(event_sample_id, event_file, vcf_glob_pattern);
 }
 
 
@@ -48,15 +49,16 @@ void    usage(const char *argv[])
 }
 
 
-int     haploh_median_depths(const char *sample_id, const char *event_file,
-			     const char *glob_pattern)
+int     haploh_median_depths(const char *event_sample_id, const char *event_file,
+			     const char *vcf_glob_pattern)
 
 {
     FILE    *vcf_stream;
-    glob_t  glob_list;
+    glob_t  vcf_glob;
     char    **vcf_filename_ptr,
 	    *depth_str,
-	    *end_num;
+	    *end_num,
+	    vcf_sample_id[PATH_MAX + 1];
     bool    same_sample,
 	    compressed;
     int     status;
@@ -74,7 +76,7 @@ int     haploh_median_depths(const char *sample_id, const char *event_file,
 	exit(EX_DATAERR);
     }
 
-    glob(glob_pattern, 0, NULL, &glob_list);
+    glob(vcf_glob_pattern, 0, NULL, &vcf_glob);
     
     /*
      *  FIXME: Rather than reread the same VCF file for each sample, it
@@ -82,11 +84,12 @@ int     haploh_median_depths(const char *sample_id, const char *event_file,
      *  Both files should be sorted by chromosome and position.
      */
     
-    for (vcf_filename_ptr = glob_list.gl_pathv; *vcf_filename_ptr != NULL;
+    for (vcf_filename_ptr = vcf_glob.gl_pathv; *vcf_filename_ptr != NULL;
 	    ++vcf_filename_ptr)
     {
-	fprintf(stderr, "%s %s\n", *vcf_filename_ptr, sample_id);
-	same_sample = (strstr(*vcf_filename_ptr, sample_id) != NULL);
+	sample_from_glob(vcf_glob_pattern, *vcf_filename_ptr, vcf_sample_id);
+	fprintf(stderr, "%s %s\n", *vcf_filename_ptr, event_sample_id);
+	same_sample = (strcmp(vcf_sample_id, event_sample_id) == 0);
 	
 	// Open VCF file
 	if ( (vcf_stream = vcf_open(*vcf_filename_ptr, &compressed)) == NULL )
@@ -94,77 +97,69 @@ int     haploh_median_depths(const char *sample_id, const char *event_file,
 	    fprintf(stderr, "Error opening VCF file %s.\n", *vcf_filename_ptr);
 	    exit(EX_NOINPUT);
 	}
+
+	/*
+	 *  Compute median depth of VCF calls between events[c].begin and events[c].end
+	 *  for this sample.
+	 *  Compute median depth of VCF calls between events[c].begin and events[c].end
+	 *  for all other samples.
+	 */
 	
-	for (c = 0; c < event_count; ++c)
+	// Count calls for same chromosome and within range
+	while ( (status = vcf_read_ss_call(vcf_stream, &vcf_call,
+			      vcf_sample, VCF_SAMPLE_MAX_CHARS)) ==
+			      VCF_READ_OK )
 	{
-	    fprintf(stderr, "Event: %s %zu %zu\n",
-		    EVENT_CHROMOSOME(events + c),
-		    events[c].begin, events[c].end);
-    
-	    /*
-	     *  Compute median depth of VCF calls between events[c].begin and events[c].end
-	     *  for this sample.
-	     *  Compute median depth of VCF calls between events[c].begin and events[c].end
-	     *  for all other samples.
-	     */
-	    
-	    // Skip calls for earlier chromosomes or positions
-	    while ( ((status = vcf_read_ss_call(vcf_stream, &vcf_call,
-				    vcf_sample, VCF_SAMPLE_MAX_CHARS))
-				    == VCF_READ_OK) &&
-		     ((chromosome_name_cmp(vcf_call.chromosome,
-					  EVENT_CHROMOSOME(events + c)) < 0) ||
-		     (vcf_call.pos < EVENT_BEGIN(events + c))) )
-		;
-	    fprintf(stderr, "Skipped calls up to %s %zu\n",
-		    vcf_call.chromosome, vcf_call.pos);
-	    
-	    // Count calls for same chromosome and within range
-	    while ( (status == VCF_READ_OK) &&
-		    (chromosome_name_cmp(vcf_call.chromosome,
-			EVENT_CHROMOSOME(events + c)) == 0) &&
-		    (vcf_call.pos <= events[c].end) )
+	    if ( (depth_str = strrchr(vcf_sample, ':')) == NULL )
 	    {
-		if ( (depth_str = strrchr(vcf_sample, ':')) == NULL )
-		{
-		    fprintf(stderr, "haploh_median_depths(): ':' expected in sample data.\n");
-		    fprintf(stderr, "Got %s.\n", vcf_sample);
-		    exit(EX_DATAERR);
-		}
-		
-		depth = strtol(depth_str + 1, &end_num, 10);
-		if ( *end_num != '\0' )
-		{
-		    fprintf(stderr, "haploh_median_depths(): ':' expected sample to end in :depth.\n");
-		    fprintf(stderr, "Got %s.\n", vcf_sample);
-		    exit(EX_DATAERR);
-		}
-		
-		event_add_depth(events + c, depth);
-		status = vcf_read_ss_call(vcf_stream, &vcf_call,
-					  vcf_sample, VCF_SAMPLE_MAX_CHARS);
-	    }
-	    fprintf(stderr, "Counted calls up to %s %zu\n",
-		    vcf_call.chromosome, vcf_call.pos);
-	    
-	    fprintf(stderr, "Found %lu matching calls.\n",
-		    EVENT_DEPTH_COUNT(events + c));
-	    
-	    /*
-	    event_depth_median()
-	    qsort(depths, count, sizeof(depth_t),
-		  (int (*)(const void *, const void *))depth_cmp);
-	    fprintf(stderr, "Median value is %u.\n", depths[(count + 1) / 2]);
-	    */
-	    
-	    if ( (status != VCF_READ_OK) && (status != VCF_READ_EOF) )
-	    {
-		fprintf(stderr, "median_depths(): Error reading VCF file.\n");
+		fprintf(stderr, "haploh_median_depths(): ':' expected in sample data.\n");
+		fprintf(stderr, "Got %s.\n", vcf_sample);
 		exit(EX_DATAERR);
 	    }
+	    
+	    depth = strtol(depth_str + 1, &end_num, 10);
+	    if ( *end_num != '\0' )
+	    {
+		fprintf(stderr, "haploh_median_depths(): ':' expected sample to end in :depth.\n");
+		fprintf(stderr, "Got %s.\n", vcf_sample);
+		exit(EX_DATAERR);
+	    }
+
+	    // FIXME: Build index of first events for each chromosome
+	    // To replace this waste of time
+	    for (c = 0; (c < event_count) &&
+			(chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
+					     vcf_call.chromosome) < 0); ++c)
+		;
+	    
+	    while ( (c < event_count) && 
+		    (chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
+					 vcf_call.chromosome) == 0) &&
+		    (events[c].end < vcf_call.pos) )
+		++c;
+	    
+	    while ( (c < event_count) && 
+		    (chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
+					 vcf_call.chromosome) == 0) &&
+		    (events[c].begin <= vcf_call.pos) )
+	    {
+		/*fprintf(stderr, "%s %zu %zu ~ %zu\n",
+			EVENT_CHROMOSOME(events + c),
+			events[c].begin, events[c].end,
+			vcf_call.pos);*/
+		++c;
+		event_add_depth(events + c, depth);
+	    }
+	}
+	
+	if ( status != VCF_READ_EOF )
+	{
+	    fprintf(stderr, "haploh_median_depths(): Error reading VCF file.\n");
+	    exit(EX_DATAERR);
 	}
 	vcf_close(vcf_stream, compressed);
     }
+    globfree(&vcf_glob);
     
     return EX_OK;
 }
@@ -197,4 +192,34 @@ int     vcf_close(FILE *vcf_stream, bool compressed)
 	return pclose(vcf_stream);
     else
 	return fclose(vcf_stream);
+}
+
+
+int     sample_from_glob(const char *vcf_glob_pattern, const char *filename,
+			 char *event_sample_id)
+
+{
+    char    *star,
+	    *p,
+	    format[PATH_MAX + 1];
+    size_t  index;
+    
+    if ( (star = strchr(vcf_glob_pattern, '*')) == NULL )
+    {
+	fprintf(stderr, "sample_from_glob(): Expected '*' in glob pattern.\n");
+	exit(EX_USAGE);
+    }
+    
+    index = star - vcf_glob_pattern;
+    memcpy(format, vcf_glob_pattern, index);
+    memcpy(format + index, "%s", 2);
+    strlcpy(format + index + 2, star + 1, PATH_MAX - (index + 2));
+    sscanf(filename, format, event_sample_id);
+    //fprintf(stderr, "format = '%s'\n", format);
+    //fprintf(stderr, "filename = '%s'\n", filename);
+    // sscanf() includes trailing text after %s
+    if ( (p = strstr(event_sample_id, star + 1)) != NULL )
+	*p = '\0';
+    //fprintf(stderr, "sample id = '%s'\n", event_sample_id);
+    return 0;
 }
