@@ -23,34 +23,31 @@
 int     main(int argc,const char *argv[])
 
 {
-    const char  *event_sample_id,
-		*event_file,
+    const char  *event_glob_pattern,
 		*vcf_glob_pattern;
     
-    if ( argc != 4 )
+    if ( argc != 3 )
 	usage(argv);
 
-    event_sample_id = argv[1];
-    event_file = argv[2];
-    vcf_glob_pattern = argv[3];
+    event_glob_pattern = argv[1];
+    vcf_glob_pattern = argv[2];
     
-    return haploh_median_depths(event_sample_id, event_file, vcf_glob_pattern);
+    return haploh_median_depths(event_glob_pattern, vcf_glob_pattern);
 }
 
 
 void    usage(const char *argv[])
 
 {
-    fprintf(stderr, "\nUsage: %s sample-id haplohseq-event-file 'vcf-filename-glob'\n", argv[0]);
-    fprintf(stderr, "\nVCF filenames must contain the sample-id. The glob for VCF filenames must\n");
+    fprintf(stderr, "\nUsage: %s 'event-file-glob-pattern' 'vcf-file-glob-pattern'\n", argv[0]);
+    fprintf(stderr, "\nVCF and event filenames must contain the sample-id. The glob patterns must\n");
     fprintf(stderr, "contain a '*' where the sample-id appears and must be enclosed in quotes.\n\n");
     fprintf(stderr, "E.g. for files like combined-NWD294426-ad.vcf.xz, glob = 'combined-*-ad.vcf.xz'.\n\n");
     exit(EX_USAGE);
 }
 
 
-int     haploh_median_depths(const char *event_sample_id,
-			     const char *event_file,
+int     haploh_median_depths(const char *event_glob_pattern,
 			     const char *vcf_glob_pattern)
 
 {
@@ -69,8 +66,7 @@ int     haploh_median_depths(const char *event_sample_id,
     static vcf_call_t  vcf_call = VCF_CALL_INIT;
     static char        vcf_sample[VCF_SAMPLE_MAX_CHARS + 1];
     
-    fprintf(stderr, "%s\n", event_file);
-    if ( (events = event_read_list(event_file, &event_count, event_sample_id))
+    if ( (events = event_read_list(event_glob_pattern, &event_count))
 	  == NULL )
     {
 	fprintf(stderr, "haploh_median_depths(): Error reading event list.\n");
@@ -89,7 +85,6 @@ int     haploh_median_depths(const char *event_sample_id,
 	    ++vcf_filename_ptr)
     {
 	sample_from_glob(vcf_glob_pattern, *vcf_filename_ptr, vcf_sample_id);
-	fprintf(stderr, "%s %s\n", *vcf_filename_ptr, event_sample_id);
 	
 	// Open VCF file
 	if ( (vcf_stream = vcf_open(*vcf_filename_ptr, &compressed)) == NULL )
