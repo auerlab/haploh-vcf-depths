@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <vcfio.h>
 #include <tsvio.h>
+#include <stdbool.h>
 #include "events.h"
 
 int     depth_cmp(depth_t *n1, depth_t *n2)
@@ -14,7 +15,8 @@ int     depth_cmp(depth_t *n1, depth_t *n2)
 }
 
 
-event_t *event_read_list(const char *event_filename, size_t *event_count)
+event_t *event_read_list(const char *event_filename, size_t *event_count,
+			 const char *sample_id)
 
 {
     FILE    *event_stream;
@@ -30,7 +32,7 @@ event_t *event_read_list(const char *event_filename, size_t *event_count)
     }
 	
     // Skip header
-    while ( (separator = event_read(event_stream, &event)) == EVENT_READ_HEADER )
+    while ( (separator = event_read(&event, event_stream, sample_id)) == EVENT_READ_HEADER )
 	;
 	
     // Small file: Read through once to count, then allocate list
@@ -38,7 +40,7 @@ event_t *event_read_list(const char *event_filename, size_t *event_count)
     while ( separator == EVENT_READ_OK )
     {
 	++*event_count;
-	separator = event_read(event_stream, &event);
+	separator = event_read(&event, event_stream, sample_id);
     }
     
     if ( separator != EVENT_READ_EOF )
@@ -55,32 +57,37 @@ event_t *event_read_list(const char *event_filename, size_t *event_count)
     
     rewind(event_stream);
     // Skip header again
-    while ( (separator = event_read(event_stream, &event)) == EVENT_READ_HEADER )
+    while ( (separator = event_read(&event, event_stream, sample_id)) == EVENT_READ_HEADER )
 	;
     for (c = 0; c < *event_count; ++c)
     {
 	events[c] = event;
-	event_read(event_stream, &event);
+	event_read(&event, event_stream, sample_id);
     }
     fclose(event_stream);
     return events;
 }
 
 
-void    event_add_depth(event_t *event, depth_t depth)
+void    event_add_depth(event_t *event, depth_t depth, const char *vcf_sample_id)
 
 {
-    ++event->depth_count;
+    //fprintf(stderr, "%s %s\n", vcf_sample_id, event->sample_id);
+    if ( strcmp(vcf_sample_id, event->sample_id) == 0 )
+	fprintf(event->same_sample_depth_stream, "%u\n", depth);
+    else
+	fprintf(event->other_samples_depth_stream, "%u\n", depth);
 }
 
 
-int     event_read(FILE *event_stream, event_t *event)
+int     event_read(event_t *event, FILE *event_stream, const char *sample_id)
 
 {
     int     separator,
 	    status;
     size_t  len;
     char    temp[VCF_POSITION_MAX_CHARS + 1],
+	    filename[PATH_MAX + 1],
 	    *endptr;
     
     separator = tsv_read_field(event_stream, event->chromosome,
@@ -122,19 +129,48 @@ int     event_read(FILE *event_stream, event_t *event)
 		fprintf(stderr, "event_read(): Invalid END: %s\n", temp);
 		return EVENT_READ_TRUNCATED;
 	    }
+
+	    // Initialize
+	    strlcpy(event->sample_id, sample_id, PATH_MAX);
+	    
+	    // Open depth files
+	    snprintf(filename, PATH_MAX, "depths-%s-%s-%zu-%zu-same.txt",
+		     sample_id, event->chromosome, event->begin, event->end);
+	    event->same_sample_depth_stream = fopen(filename, "w");
+	    if ( event->same_sample_depth_stream == NULL )
+	    {
+		fprintf(stderr, "event_read(): Could not open %s: %s\n",
+			filename, strerror(errno));
+		exit(EX_CANTCREAT);
+	    }
+	    
+	    snprintf(filename, PATH_MAX, "depths-%s-%s-%zu-%zu-others.txt",
+		     sample_id, event->chromosome, event->begin, event->end);
+	    event->other_samples_depth_stream = fopen(filename, "w");
+	    if ( event->other_samples_depth_stream == NULL )
+	    {
+		fprintf(stderr, "event_read(): Could not open %s: %s\n",
+			filename, strerror(errno));
+		exit(EX_CANTCREAT);
+	    }
+
+	    fprintf(stderr, "Opened %s %s %zu %zu %p %p\n", event->sample_id,
+		    event->chromosome, event->begin, event->end,
+		    event->same_sample_depth_stream,
+		    event->other_samples_depth_stream);
 	    status = EVENT_READ_OK;
 	}
+	
 	if ( (separator = tsv_skip_rest_of_line(event_stream)) != '\n' )
 	{
 	    fprintf(stderr, "event_read(): Did not find newline at end of events[c].\n");
 	    return EVENT_READ_TRUNCATED;
 	}
+	
 	return status;
     }
+    else
     
     // fprintf(stderr, "separator = %d\n", separator);
-    event->depth_count = 0;
-    // Open depth files
     return separator;
 }
-

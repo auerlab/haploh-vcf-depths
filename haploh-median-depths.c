@@ -49,7 +49,8 @@ void    usage(const char *argv[])
 }
 
 
-int     haploh_median_depths(const char *event_sample_id, const char *event_file,
+int     haploh_median_depths(const char *event_sample_id,
+			     const char *event_file,
 			     const char *vcf_glob_pattern)
 
 {
@@ -59,8 +60,7 @@ int     haploh_median_depths(const char *event_sample_id, const char *event_file
 	    *depth_str,
 	    *end_num,
 	    vcf_sample_id[PATH_MAX + 1];
-    bool    same_sample,
-	    compressed;
+    bool    compressed;
     int     status;
     size_t  event_count,
 	    c;
@@ -70,7 +70,8 @@ int     haploh_median_depths(const char *event_sample_id, const char *event_file
     static char        vcf_sample[VCF_SAMPLE_MAX_CHARS + 1];
     
     fprintf(stderr, "%s\n", event_file);
-    if ( (events = event_read_list(event_file, &event_count)) == NULL )
+    if ( (events = event_read_list(event_file, &event_count, event_sample_id))
+	  == NULL )
     {
 	fprintf(stderr, "haploh_median_depths(): Error reading event list.\n");
 	exit(EX_DATAERR);
@@ -89,7 +90,6 @@ int     haploh_median_depths(const char *event_sample_id, const char *event_file
     {
 	sample_from_glob(vcf_glob_pattern, *vcf_filename_ptr, vcf_sample_id);
 	fprintf(stderr, "%s %s\n", *vcf_filename_ptr, event_sample_id);
-	same_sample = (strcmp(vcf_sample_id, event_sample_id) == 0);
 	
 	// Open VCF file
 	if ( (vcf_stream = vcf_open(*vcf_filename_ptr, &compressed)) == NULL )
@@ -147,8 +147,8 @@ int     haploh_median_depths(const char *event_sample_id, const char *event_file
 			EVENT_CHROMOSOME(events + c),
 			events[c].begin, events[c].end,
 			vcf_call.pos);*/
+		event_add_depth(events + c, depth, vcf_sample_id);
 		++c;
-		event_add_depth(events + c, depth);
 	    }
 	}
 	
@@ -160,6 +160,8 @@ int     haploh_median_depths(const char *event_sample_id, const char *event_file
 	vcf_close(vcf_stream, compressed);
     }
     globfree(&vcf_glob);
+    
+    // Close depth files for all events
     
     return EX_OK;
 }
