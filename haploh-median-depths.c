@@ -33,16 +33,6 @@ int     main(int argc,const char *argv[])
     event_file = argv[2];
     glob_pattern = argv[3];
     
-    /*
-    if ( (stat(vcf_dir, &dir_stat) == -1) || !S_ISDIR(dir_stat.st_mode) )
-    {
-	fprintf(stderr,
-		"%s must be a readable directory containing VCF files.\n",
-		vcf_dir);
-	exit(EX_NOINPUT);
-    }
-    */
-	    
     return haploh_median_depths(sample_id, event_file, glob_pattern);
 }
 
@@ -62,24 +52,26 @@ int     haploh_median_depths(const char *sample_id, const char *event_file,
 			     const char *glob_pattern)
 
 {
-    int     separator;
-    event_t event;
-    FILE    *event_stream,
-	    *vcf_stream;
+    FILE    *vcf_stream;
     glob_t  glob_list;
-    char    **vcf_filename_ptr;
+    char    **vcf_filename_ptr,
+	    *depth_str,
+	    *end_num;
     bool    same_sample,
 	    compressed;
-    int             status;
-    unsigned long   count;
+    int     status;
+    size_t  event_count,
+	    c;
+    event_t *events;
+    depth_t depth;
     static vcf_call_t  vcf_call = VCF_CALL_INIT;
     static char        vcf_sample[VCF_SAMPLE_MAX_CHARS + 1];
     
     fprintf(stderr, "%s\n", event_file);
-    if ( (event_stream = fopen(event_file, "r")) == NULL )
+    if ( (events = event_read_list(event_file, &event_count)) == NULL )
     {
-	fprintf(stderr, "Cannot open %s: %s\n", event_file, strerror(errno));
-	exit(EX_NOINPUT);
+	fprintf(stderr, "haploh_median_depths(): Error reading event list.\n");
+	exit(EX_DATAERR);
     }
 
     glob(glob_pattern, 0, NULL, &glob_list);
@@ -103,30 +95,26 @@ int     haploh_median_depths(const char *sample_id, const char *event_file,
 	    exit(EX_NOINPUT);
 	}
 	
-	// Skip header
-	while ( (separator = read_event(event_stream, &event)) == EVENT_READ_HEADER )
-	    ;
-	
-	// Read next event
-	while ( separator == EVENT_READ_OK )
+	for (c = 0; c < event_count; ++c)
 	{
-	    fprintf(stderr, "Event: %s %zu %zu\n", event.chromosome,
-		    event.begin, event.end);
-	    count = 0;
+	    fprintf(stderr, "Event: %s %zu %zu\n",
+		    EVENT_CHROMOSOME(events + c),
+		    events[c].begin, events[c].end);
     
 	    /*
-	     *  Compute median depth of VCF calls between event.begin and event.end
+	     *  Compute median depth of VCF calls between events[c].begin and events[c].end
 	     *  for this sample.
-	     *  Compute median depth of VCF calls between event.begin and event.end
+	     *  Compute median depth of VCF calls between events[c].begin and events[c].end
 	     *  for all other samples.
 	     */
 	    
 	    // Skip calls for earlier chromosomes or positions
-	    while ( ((status = vcf_read_ss_call(vcf_stream, &vcf_call, vcf_sample,
-						VCF_SAMPLE_MAX_CHARS)) == VCF_READ_OK) &&
+	    while ( ((status = vcf_read_ss_call(vcf_stream, &vcf_call,
+				    vcf_sample, VCF_SAMPLE_MAX_CHARS))
+				    == VCF_READ_OK) &&
 		     ((chromosome_name_cmp(vcf_call.chromosome,
-					  event.chromosome) < 0) ||
-		     (vcf_call.pos < event.begin)) )
+					  EVENT_CHROMOSOME(events + c)) < 0) ||
+		     (vcf_call.pos < EVENT_BEGIN(events + c))) )
 		;
 	    fprintf(stderr, "Skipped calls up to %s %zu\n",
 		    vcf_call.chromosome, vcf_call.pos);
@@ -134,107 +122,51 @@ int     haploh_median_depths(const char *sample_id, const char *event_file,
 	    // Count calls for same chromosome and within range
 	    while ( (status == VCF_READ_OK) &&
 		    (chromosome_name_cmp(vcf_call.chromosome,
-					 event.chromosome) == 0) &&
-		    (vcf_call.pos <= event.end) )
+			EVENT_CHROMOSOME(events + c)) == 0) &&
+		    (vcf_call.pos <= events[c].end) )
 	    {
-		++count;
+		if ( (depth_str = strrchr(vcf_sample, ':')) == NULL )
+		{
+		    fprintf(stderr, "haploh_median_depths(): ':' expected in sample data.\n");
+		    fprintf(stderr, "Got %s.\n", vcf_sample);
+		    exit(EX_DATAERR);
+		}
+		
+		depth = strtol(depth_str + 1, &end_num, 10);
+		if ( *end_num != '\0' )
+		{
+		    fprintf(stderr, "haploh_median_depths(): ':' expected sample to end in :depth.\n");
+		    fprintf(stderr, "Got %s.\n", vcf_sample);
+		    exit(EX_DATAERR);
+		}
+		
+		event_add_depth(events + c, depth);
 		status = vcf_read_ss_call(vcf_stream, &vcf_call,
 					  vcf_sample, VCF_SAMPLE_MAX_CHARS);
 	    }
 	    fprintf(stderr, "Counted calls up to %s %zu\n",
 		    vcf_call.chromosome, vcf_call.pos);
 	    
-	    fprintf(stderr, "Found %lu matching calls.\n", count);
+	    fprintf(stderr, "Found %lu matching calls.\n",
+		    EVENT_DEPTH_COUNT(events + c));
+	    
+	    /*
+	    event_depth_median()
+	    qsort(depths, count, sizeof(depth_t),
+		  (int (*)(const void *, const void *))depth_cmp);
+	    fprintf(stderr, "Median value is %u.\n", depths[(count + 1) / 2]);
+	    */
 	    
 	    if ( (status != VCF_READ_OK) && (status != VCF_READ_EOF) )
 	    {
 		fprintf(stderr, "median_depths(): Error reading VCF file.\n");
 		exit(EX_DATAERR);
 	    }
-	    
-	    // Next event
-	    separator = read_event(event_stream, &event);
 	}
 	vcf_close(vcf_stream, compressed);
-
-	if ( separator != EVENT_READ_EOF )
-	{
-	    fprintf(stderr, "haploh_media_depths(): Error reading event stream.\n");
-	    exit(EX_DATAERR);
-	}
-
-	// Reread events file for each VCF file.  Events files are usually
-	// small, so this won't cost much.
-	rewind(event_stream);
     }
     
-    fclose(event_stream);
-    if ( separator == EOF )
-	return EX_OK;
-    else
-	return EX_DATAERR;
-}
-
-
-int     read_event(FILE *event_stream, event_t *event)
-
-{
-    int     separator,
-	    status;
-    size_t  len;
-    char    temp[VCF_POSITION_MAX_CHARS + 1],
-	    *endptr;
-    
-    separator = tsv_read_field(event_stream, event->chromosome,
-			       VCF_CHROMOSOME_MAX_CHARS, &len);
-    if ( separator == '\t' )
-    {
-	// fprintf(stderr, "chromosome = %s\n", event->chromosome);
-	
-	// BEGIN
-	if ( (separator = tsv_read_field(event_stream, temp,
-			       VCF_POSITION_MAX_CHARS, &len)) != '\t' )
-	{
-	    fputs("read_event(): Did not find tab after BEGIN.\n", stderr);
-	    return EVENT_READ_TRUNCATED;
-	}
-	if ( strcmp(temp, "BEGIN") == 0 )
-	{
-	    status = EVENT_READ_HEADER;
-	}
-	else
-	{
-	    event->begin = strtoul(temp, &endptr, 10);
-	    if ( *endptr != '\0' )
-	    {
-		fprintf(stderr, "read_event(): Invalid BEGIN: %s\n", temp);
-		return EVENT_READ_TRUNCATED;
-	    }
-	    
-	    // END
-	    if ( (separator = tsv_read_field(event_stream, temp,
-				   VCF_POSITION_MAX_CHARS, &len)) != '\t' )
-	    {
-		fputs("read_event(): Did not find tab after END.\n", stderr);
-		return EVENT_READ_TRUNCATED;
-	    }
-	    event->end = strtoul(temp, &endptr, 10);
-	    if ( *endptr != '\0' )
-	    {
-		fprintf(stderr, "read_event(): Invalid END: %s\n", temp);
-		return EVENT_READ_TRUNCATED;
-	    }
-	    status = EVENT_READ_OK;
-	}
-	if ( (separator = tsv_skip_rest_of_line(event_stream)) != '\n' )
-	{
-	    fprintf(stderr, "read_event(): Did not find newline at end of event.\n");
-	    return EVENT_READ_TRUNCATED;
-	}
-	return status;
-    }
-    // fprintf(stderr, "separator = %d\n", separator);
-    return separator;
+    return EX_OK;
 }
 
 

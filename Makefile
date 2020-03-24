@@ -49,7 +49,7 @@ BIN     = haploh-median-depths
 ############################################################################
 # List object files that comprise BIN.
 
-OBJS    = haploh-median-depths.o
+OBJS    = haploh-median-depths.o events.o
 
 ############################################################################
 # Compile, link, and install options
