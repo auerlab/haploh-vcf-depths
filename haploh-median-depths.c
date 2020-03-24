@@ -129,24 +129,24 @@ int     haploh_median_depths(const char *event_sample_id,
 	    // To replace this waste of time
 	    for (c = 0; (c < event_count) &&
 			(chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
-					     vcf_call.chromosome) < 0); ++c)
+			    VCF_CHROMOSOME(&vcf_call)) < 0); ++c)
 		;
 	    
 	    while ( (c < event_count) && 
 		    (chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
-					 vcf_call.chromosome) == 0) &&
-		    (events[c].end < vcf_call.pos) )
+					 VCF_CHROMOSOME(&vcf_call)) == 0) &&
+		    (events[c].end < VCF_POS(&vcf_call)) )
 		++c;
 	    
 	    while ( (c < event_count) && 
 		    (chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
-					 vcf_call.chromosome) == 0) &&
-		    (events[c].begin <= vcf_call.pos) )
+					 VCF_CHROMOSOME(&vcf_call)) == 0) &&
+		    (events[c].begin <= VCF_POS(&vcf_call)) )
 	    {
 		/*fprintf(stderr, "%s %zu %zu ~ %zu\n",
 			EVENT_CHROMOSOME(events + c),
 			events[c].begin, events[c].end,
-			vcf_call.pos);*/
+			VCF_POS(&vcf_call));*/
 		event_add_depth(events + c, depth, vcf_sample_id);
 		++c;
 	    }
