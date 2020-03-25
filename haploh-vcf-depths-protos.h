@@ -1,4 +1,4 @@
-/* haploh-median-depths.c */
+/* haploh-vcf-depths.c */
 int main(int argc, const char *argv[]);
 void usage(const char *argv[]);
 int haploh_median_depths(const char *event_glob_pattern, const char *vcf_glob_pattern);

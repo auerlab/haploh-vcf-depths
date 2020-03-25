@@ -43,13 +43,13 @@
 ############################################################################
 # Installed targets
 
-BIN     = haploh-median-depths
-# MAN     = haploh-median-depths.1
+BIN     = haploh-vcf-depths
+# MAN     = haploh-vcf-depths.1
 
 ############################################################################
 # List object files that comprise BIN.
 
-OBJS    = haploh-median-depths.o events.o
+OBJS    = haploh-vcf-depths.o events.o
 
 ############################################################################
 # Compile, link, and install options

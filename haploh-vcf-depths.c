@@ -18,7 +18,7 @@
 #include <glob.h>
 #include <stdbool.h>
 #include <limits.h>
-#include "haploh-median-depths.h"
+#include "haploh-vcf-depths.h"
 
 int     main(int argc,const char *argv[])
 

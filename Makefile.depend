@@ -1,10 +1,14 @@
-events.o: events.c events.h events-protos.h
-	${CC} -c ${CFLAGS} events.c
-
-haploh-median-depths.o: haploh-median-depths.c ../local/include/vcfio.h \
+events.o: events.c ../local/include/vcfio.h \
   ../local/include/vcfio-protos.h \
   ../local/include/chromosome-name-cmp-protos.h ../local/include/tsvio.h \
-  ../local/include/tsvio-protos.h haploh-median-depths.h events.h \
-  events-protos.h haploh-median-depths-protos.h
-	${CC} -c ${CFLAGS} haploh-median-depths.c
+  ../local/include/tsvio-protos.h events.h events-protos.h \
+  haploh-vcf-depths-protos.h
+	${CC} -c ${CFLAGS} events.c
+
+haploh-vcf-depths.o: haploh-vcf-depths.c ../local/include/vcfio.h \
+  ../local/include/vcfio-protos.h \
+  ../local/include/chromosome-name-cmp-protos.h ../local/include/tsvio.h \
+  ../local/include/tsvio-protos.h haploh-vcf-depths.h events.h \
+  events-protos.h haploh-vcf-depths-protos.h
+	${CC} -c ${CFLAGS} haploh-vcf-depths.c
 

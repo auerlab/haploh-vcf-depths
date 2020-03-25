@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <glob.h>
 #include "events.h"
-#include "haploh-median-depths-protos.h"    // Temporary for sample_from_glob()
+#include "haploh-vcf-depths-protos.h"    // Temporary for sample_from_glob()
 
 int     depth_cmp(depth_t *n1, depth_t *n2)
 
