@@ -3,10 +3,10 @@
 #include <sysexits.h>
 #include <string.h>
 #include <errno.h>
-#include <vcfio.h>
-#include <tsvio.h>
 #include <stdbool.h>
 #include <glob.h>
+#include <vcfio.h>
+#include <biostring.h>
 #include "events.h"
 #include "haploh-vcf-depths-protos.h"    // Temporary for sample_from_glob()
 

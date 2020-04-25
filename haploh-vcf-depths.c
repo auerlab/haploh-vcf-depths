@@ -13,11 +13,11 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <string.h>
-#include <vcfio.h>
-#include <tsvio.h>
 #include <glob.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <vcfio.h>
+#include <biostring.h>
 #include "haploh-vcf-depths.h"
 
 int     main(int argc,const char *argv[])
