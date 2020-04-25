@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <glob.h>
+#include <sys/stat.h>
 #include <vcfio.h>
 #include <biostring.h>
 #include "events.h"
@@ -204,9 +205,10 @@ void    event_open_depth_files(event_t *events, size_t event_count)
     size_t  c;
     char    filename[PATH_MAX + 1];
 
+    mkdir("Depths", 0755);
     for (c = 0; c < event_count; ++c)
     {
-	snprintf(filename, PATH_MAX, "depths-%s-%s-%zu-%zu-same.txt",
+	snprintf(filename, PATH_MAX, "Depths/depths-%s-%s-%zu-%zu-same.txt",
 		 events[c].sample_id, events[c].chromosome,
 		 events[c].begin, events[c].end);
 	events[c].same_sample_depth_stream = fopen(filename, "w");
@@ -217,7 +219,7 @@ void    event_open_depth_files(event_t *events, size_t event_count)
 	    exit(EX_CANTCREAT);
 	}
 	
-	snprintf(filename, PATH_MAX, "depths-%s-%s-%zu-%zu-others.txt",
+	snprintf(filename, PATH_MAX, "Depths/depths-%s-%s-%zu-%zu-others.txt",
 		 events[c].sample_id, events[c].chromosome,
 		 events[c].begin, events[c].end);
 	events[c].other_samples_depth_stream = fopen(filename, "w");
