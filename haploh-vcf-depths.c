@@ -126,26 +126,26 @@ int     haploh_median_depths(const char *event_glob_pattern,
 
 	    // Skip VCF calls for chromosomes before the first event
 	    if ( chromosome_name_cmp(VCF_CHROMOSOME(&vcf_call),
-				     EVENT_CHROMOSOME(events + 0)) < 0 )
+				     EVENT_CHROMOSOME(events + 0), 3) < 0 )
 		continue;
 		
 	    // FIXME: Build index of first events for each chromosome
 	    // to replace this waste of time?
 	    for (c = 0; (c < event_count) &&
 			(chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
-			    VCF_CHROMOSOME(&vcf_call)) < 0); ++c)
+			    VCF_CHROMOSOME(&vcf_call), 3) < 0); ++c)
 		;
 	    
 	    while ( (c < event_count) && 
 		    (events[c].end < VCF_POS(&vcf_call)) &&
 		    (chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
-					 VCF_CHROMOSOME(&vcf_call)) == 0) )
+					 VCF_CHROMOSOME(&vcf_call), 3) == 0) )
 		++c;
 	    
 	    while ( (c < event_count) && 
 		    (events[c].begin <= VCF_POS(&vcf_call)) &&
 		    (chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
-					 VCF_CHROMOSOME(&vcf_call)) == 0) )
+					 VCF_CHROMOSOME(&vcf_call), 3) == 0) )
 	    {
 		/*fprintf(stderr, "%s %zu %zu ~ %zu\n",
 			EVENT_CHROMOSOME(events + c),
