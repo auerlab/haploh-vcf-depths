@@ -18,6 +18,7 @@
 #include <limits.h>
 #include <xtend.h>      // strlcpy() on Linux
 #include <biolibc/vcf.h>
+#include <biolibc/biostring.h>
 #include "haploh-vcf-depths.h"
 
 int     main(int argc,const char *argv[])
