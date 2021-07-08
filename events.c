@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <xtend.h>      // strlcpy() on Linux
 #include <biolibc/vcf.h>
+#include <biolibc/biostring.h>
 #include "events.h"
 #include "haploh-vcf-depths-protos.h"    // Temporary for sample_from_glob()
 
