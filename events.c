@@ -134,18 +134,18 @@ int     event_read(event_t *event, FILE *event_stream, const char *event_sample_
     int     separator,
 	    status;
     size_t  len;
-    char    temp[BIO_POSITION_MAX_DIGITS + 1],
+    char    temp[BL_POSITION_MAX_DIGITS + 1],
 	    *endptr;
     
     separator = tsv_read_field(event_stream, event->chromosome,
-			       BIO_CHROMOSOME_MAX_CHARS, &len);
+			       BL_CHROMOSOME_MAX_CHARS, &len);
     if ( separator == '\t' )
     {
 	// fprintf(stderr, "chromosome = %s\n", event->chromosome);
 	
 	// BEGIN
 	if ( (separator = tsv_read_field(event_stream, temp,
-			       BIO_POSITION_MAX_DIGITS, &len)) != '\t' )
+			       BL_POSITION_MAX_DIGITS, &len)) != '\t' )
 	{
 	    fputs("event_read(): Did not find tab after BEGIN.\n", stderr);
 	    return EVENT_READ_TRUNCATED;
@@ -165,7 +165,7 @@ int     event_read(event_t *event, FILE *event_stream, const char *event_sample_
 	    
 	    // END
 	    if ( (separator = tsv_read_field(event_stream, temp,
-				   BIO_POSITION_MAX_DIGITS, &len)) != '\t' )
+				   BL_POSITION_MAX_DIGITS, &len)) != '\t' )
 	    {
 		fputs("event_read(): Did not find tab after END.\n", stderr);
 		return EVENT_READ_TRUNCATED;

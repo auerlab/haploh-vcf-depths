@@ -66,7 +66,7 @@ int     haploh_median_depths(const char *event_glob_pattern,
 	    vcf_count = 0;
     event_t *events;
     depth_t depth;
-    static vcf_call_t  vcf_call;
+    static bl_vcf_t  vcf_call;
     static char        vcf_sample[VCF_SAMPLE_MAX_CHARS + 1];
     
     vcf_call_init(&vcf_call, VCF_INFO_MAX_CHARS, VCF_FORMAT_MAX_CHARS,
@@ -110,7 +110,7 @@ int     haploh_median_depths(const char *event_glob_pattern,
 	
 	// Count calls for same chromosome and within range
 	while ( (status = vcf_read_ss_call(vcf_stream, &vcf_call,
-					   VCF_FIELD_ALL)) == BIO_READ_OK )
+					   VCF_FIELD_ALL)) == BL_READ_OK )
 	{
 	    if ( (depth_str = strrchr(vcf_sample, ':')) == NULL )
 	    {
@@ -174,7 +174,7 @@ int     haploh_median_depths(const char *event_glob_pattern,
 	    }
 	}
 	
-	if ( status != BIO_READ_EOF )
+	if ( status != BL_READ_EOF )
 	{
 	    fprintf(stderr, "haploh_median_depths(): Error reading VCF file.\n");
 	    snprintf(cmd, CMD_MAX + 1, "mv %s Broken", *vcf_filename_ptr);
