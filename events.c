@@ -247,7 +247,7 @@ int     event_cmp(const event_t *e1, const event_t *e2)
 {
     int     status;
     
-    status = chromosome_name_cmp(e1->chromosome, e2->chromosome);
+    status = bl_chromosome_name_cmp(e1->chromosome, e2->chromosome);
     if ( status == 0 )
 	status = e1->begin - e2->begin;;
     if ( status == 0 )
