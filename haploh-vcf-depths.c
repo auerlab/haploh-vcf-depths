@@ -67,10 +67,10 @@ int     haploh_median_depths(const char *event_glob_pattern,
     event_t *events;
     depth_t depth;
     static bl_vcf_t  vcf_call;
-    static char        vcf_sample[VCF_SAMPLE_MAX_CHARS + 1];
+    static char        vcf_sample[BL_VCF_SAMPLE_MAX_CHARS + 1];
     
-    vcf_call_init(&vcf_call, VCF_INFO_MAX_CHARS, VCF_FORMAT_MAX_CHARS,
-		  VCF_SAMPLE_MAX_CHARS);
+    vcf_call_init(&vcf_call, BL_VCF_INFO_MAX_CHARS, BL_VCF_FORMAT_MAX_CHARS,
+		  BL_VCF_SAMPLE_MAX_CHARS);
     
     if ( (events = event_read_list(event_glob_pattern, &event_count))
 	  == NULL )
@@ -110,7 +110,7 @@ int     haploh_median_depths(const char *event_glob_pattern,
 	
 	// Count calls for same chromosome and within range
 	while ( (status = vcf_read_ss_call(vcf_stream, &vcf_call,
-					   VCF_FIELD_ALL)) == BL_READ_OK )
+					   BL_VCF_FIELD_ALL)) == BL_READ_OK )
 	{
 	    if ( (depth_str = strrchr(vcf_sample, ':')) == NULL )
 	    {
@@ -128,7 +128,7 @@ int     haploh_median_depths(const char *event_glob_pattern,
 	    }
 
 	    // Skip VCF calls for chromosomes before the first event
-	    if ( chromosome_name_cmp(VCF_CHROMOSOME(&vcf_call),
+	    if ( chromosome_name_cmp(BL_VCF_CHROMOSOME(&vcf_call),
 				     EVENT_CHROMOSOME(events + 0)) < 0 )
 		continue;
 		
@@ -136,24 +136,24 @@ int     haploh_median_depths(const char *event_glob_pattern,
 	    // to replace this waste of time?
 	    for (c = 0; (c < event_count) &&
 			(chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
-			    VCF_CHROMOSOME(&vcf_call)) < 0); ++c)
+			    BL_VCF_CHROMOSOME(&vcf_call)) < 0); ++c)
 		;
 	    
 	    while ( (c < event_count) && 
-		    (events[c].end < VCF_POS(&vcf_call)) &&
+		    (events[c].end < BL_VCF_POS(&vcf_call)) &&
 		    (chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
-					 VCF_CHROMOSOME(&vcf_call)) == 0) )
+					 BL_VCF_CHROMOSOME(&vcf_call)) == 0) )
 		++c;
 	    
 	    while ( (c < event_count) && 
-		    (events[c].begin <= VCF_POS(&vcf_call)) &&
+		    (events[c].begin <= BL_VCF_POS(&vcf_call)) &&
 		    (chromosome_name_cmp(EVENT_CHROMOSOME(events + c),
-					 VCF_CHROMOSOME(&vcf_call)) == 0) )
+					 BL_VCF_CHROMOSOME(&vcf_call)) == 0) )
 	    {
 		/*fprintf(stderr, "%s %zu %zu ~ %zu\n",
 			EVENT_CHROMOSOME(events + c),
 			events[c].begin, events[c].end,
-			VCF_POS(&vcf_call));*/
+			BL_VCF_POS(&vcf_call));*/
 		if ( (depth_str = strrchr(vcf_sample, ':')) == NULL )
 		{
 		    fprintf(stderr, "haploh_median_depths(): ':' expected in sample data.\n");
