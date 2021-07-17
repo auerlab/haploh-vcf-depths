@@ -69,7 +69,7 @@ int     haploh_median_depths(const char *event_glob_pattern,
     static bl_vcf_t  vcf_call;
     static char        vcf_sample[BL_VCF_SAMPLE_MAX_CHARS + 1];
     
-    vcf_call_init(&vcf_call, BL_VCF_INFO_MAX_CHARS, BL_VCF_FORMAT_MAX_CHARS,
+    bl_vcf_call_init(&vcf_call, BL_VCF_INFO_MAX_CHARS, BL_VCF_FORMAT_MAX_CHARS,
 		  BL_VCF_SAMPLE_MAX_CHARS);
     
     if ( (events = event_read_list(event_glob_pattern, &event_count))
@@ -109,7 +109,7 @@ int     haploh_median_depths(const char *event_glob_pattern,
 	 */
 	
 	// Count calls for same chromosome and within range
-	while ( (status = vcf_read_ss_call(vcf_stream, &vcf_call,
+	while ( (status = bl_vcf_read_ss_call(vcf_stream, &vcf_call,
 					   BL_VCF_FIELD_ALL)) == BL_READ_OK )
 	{
 	    if ( (depth_str = strrchr(vcf_sample, ':')) == NULL )
