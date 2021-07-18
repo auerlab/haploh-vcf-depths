@@ -69,7 +69,7 @@ int     haploh_median_depths(const char *event_glob_pattern,
     static bl_vcf_t  vcf_call;
     static char        vcf_sample[BL_VCF_SAMPLE_MAX_CHARS + 1];
     
-    bl_vcf_call_init(&vcf_call, BL_VCF_INFO_MAX_CHARS, BL_VCF_FORMAT_MAX_CHARS,
+    bl_vcf_init(&vcf_call, BL_VCF_INFO_MAX_CHARS, BL_VCF_FORMAT_MAX_CHARS,
 		  BL_VCF_SAMPLE_MAX_CHARS);
     
     if ( (events = event_read_list(event_glob_pattern, &event_count))
