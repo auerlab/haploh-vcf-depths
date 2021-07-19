@@ -4,7 +4,7 @@ typedef unsigned short  depth_t;
 
 typedef struct
 {
-    char    chromosome[BL_CHROMOSOME_MAX_CHARS + 1];
+    char    chromosome[BL_CHROM_MAX_CHARS + 1];
     char    sample_id[PATH_MAX + 1];
     size_t  begin,
 	    end;

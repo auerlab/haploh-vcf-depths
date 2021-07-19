@@ -138,7 +138,7 @@ int     event_read(event_t *event, FILE *event_stream, const char *event_sample_
 	    *endptr;
     
     separator = tsv_read_field(event_stream, event->chromosome,
-			       BL_CHROMOSOME_MAX_CHARS, &len);
+			       BL_CHROM_MAX_CHARS, &len);
     if ( separator == '\t' )
     {
 	// fprintf(stderr, "chromosome = %s\n", event->chromosome);
@@ -247,7 +247,7 @@ int     event_cmp(const event_t *e1, const event_t *e2)
 {
     int     status;
     
-    status = bl_chromosome_name_cmp(e1->chromosome, e2->chromosome);
+    status = bl_chrom_name_cmp(e1->chromosome, e2->chromosome);
     if ( status == 0 )
 	status = e1->begin - e2->begin;;
     if ( status == 0 )
