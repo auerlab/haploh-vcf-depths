@@ -16,7 +16,7 @@
 #include <glob.h>
 #include <stdbool.h>
 #include <limits.h>
-#include <xtend.h>      // strlcpy() on Linux
+#include <xtend/string.h>   // strlcpy() on Linux
 #include <biolibc/vcf.h>
 #include <biolibc/biostring.h>
 #include "haploh-vcf-depths.h"

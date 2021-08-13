@@ -6,7 +6,8 @@
 #include <stdbool.h>
 #include <glob.h>
 #include <sys/stat.h>
-#include <xtend.h>      // strlcpy() on Linux
+#include <xtend/string.h>   // strlcpy() on Linux
+#include <xtend/dsv.h>
 #include <biolibc/vcf.h>
 #include <biolibc/biostring.h>
 #include "events.h"
