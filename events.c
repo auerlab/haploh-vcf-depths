@@ -138,14 +138,14 @@ int     event_read(event_t *event, FILE *event_stream, const char *event_sample_
     char    temp[BL_POSITION_MAX_DIGITS + 1],
 	    *endptr;
     
-    separator = tsv_read_field(event_stream, event->chromosome,
+    separator = xt_tsv_read_field(event_stream, event->chromosome,
 			       BL_CHROM_MAX_CHARS, &len);
     if ( separator == '\t' )
     {
 	// fprintf(stderr, "chromosome = %s\n", event->chromosome);
 	
 	// BEGIN
-	if ( (separator = tsv_read_field(event_stream, temp,
+	if ( (separator = xt_tsv_read_field(event_stream, temp,
 			       BL_POSITION_MAX_DIGITS, &len)) != '\t' )
 	{
 	    fputs("event_read(): Did not find tab after BEGIN.\n", stderr);
@@ -165,7 +165,7 @@ int     event_read(event_t *event, FILE *event_stream, const char *event_sample_
 	    }
 	    
 	    // END
-	    if ( (separator = tsv_read_field(event_stream, temp,
+	    if ( (separator = xt_tsv_read_field(event_stream, temp,
 				   BL_POSITION_MAX_DIGITS, &len)) != '\t' )
 	    {
 		fputs("event_read(): Did not find tab after END.\n", stderr);
@@ -186,7 +186,7 @@ int     event_read(event_t *event, FILE *event_stream, const char *event_sample_
 	    status = EVENT_READ_OK;
 	}
 	
-	if ( (separator = tsv_skip_rest_of_line(event_stream)) != '\n' )
+	if ( (separator = xt_tsv_skip_rest_of_line(event_stream)) != '\n' )
 	{
 	    fprintf(stderr, "event_read(): Did not find newline at end of events[c].\n");
 	    return EVENT_READ_TRUNCATED;
