@@ -177,8 +177,11 @@ int     haploh_median_depths(const char *event_glob_pattern,
 	{
 	    fprintf(stderr, "haploh_median_depths(): Error reading VCF file.\n");
 	    snprintf(cmd, CMD_MAX + 1, "mv %s Broken", *vcf_filename_ptr);
-	    system(cmd);
-	    //exit(EX_DATAERR);
+	    if ( system(cmd) != 0 )
+	    {
+		fprintf(stderr, "%s(): mv failed.\n", __FUNCTION__);
+		exit(EX_OSERR);
+	    }
 	}
 	vcf_close(vcf_stream, compressed);
     }
